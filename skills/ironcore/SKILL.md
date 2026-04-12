@@ -14,7 +14,7 @@ When invoked: assesses hardware context (bare-metal / RTOS / HAL / ISR), loads t
 
 **Core principle:** Embedded systems have zero margin for error — timing violations, race conditions, and memory corruption cause real-world failures. Design for determinism and verifiability.
 
-**Announce at start:** "I'm using the IRONCORE skill for EE-specific patterns."
+**Announce at start:** "Running IRONCORE for embedded systems patterns."
 
 ---
 

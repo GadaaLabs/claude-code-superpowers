@@ -327,13 +327,13 @@ Task N: <task name>
 ## Integration with Other Skills
 
 **Used by:**
-- `superpowers:brainstorming` — Search for past design approaches
-- `superpowers:systematic-debugging` — Search for similar bug patterns
-- `superpowers:subagent-driven-development` — Include patterns in task context
-- `superpowers:writing-plans` — Reference patterns in plan steps
+- `superpowers:architect` — Search for past design approaches
+- `superpowers:hunter` — Search for similar bug patterns
+- `superpowers:phantom` — Include patterns in task context
+- `superpowers:blueprint` — Reference patterns in plan steps
 
 **Calls:**
-- `superpowers:verification-before-completion` — Verify pattern worked before storing
+- `superpowers:sentinel` — Verify pattern worked before storing
 
 ## Example: Complete Learning Cycle
 

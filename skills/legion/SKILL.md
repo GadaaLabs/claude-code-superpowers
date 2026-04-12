@@ -34,7 +34,7 @@ This skill adds **swarm coordination topologies** to Superpowers. Choose the rig
 │   └─────┘  └─────┘  └─────┘                                │
 │                                                             │
 │  Best for: Plan execution, structured tasks                 │
-│  Use: subagent-driven-development default                   │
+│  Use: phantom default                                       │
 ├─────────────────────────────────────────────────────────────┤
 │  MESH (Peer-to-peer)                                        │
 │                                                             │
@@ -188,7 +188,7 @@ TASKS:
 - Codebase exploration (find all usages)
 - Bug investigation (multiple hypotheses)
 - Research tasks (gather diverse perspectives)
-- Design brainstorming (collaborative ideation)
+- Design exploration (collaborative ideation)
 
 **When to use:**
 ```

@@ -53,7 +53,7 @@ digraph skill_flow {
     "User message received" [shape=doublecircle];
     "About to EnterPlanMode?" [shape=doublecircle];
     "Already brainstormed?" [shape=diamond];
-    "Invoke brainstorming skill" [shape=box];
+    "Invoke architect skill" [shape=box];
     "Might any skill apply?" [shape=diamond];
     "Invoke Skill tool" [shape=box];
     "Announce: 'Using [skill] to [purpose]'" [shape=box];
@@ -63,9 +63,9 @@ digraph skill_flow {
     "Respond (including clarifications)" [shape=doublecircle];
 
     "About to EnterPlanMode?" -> "Already brainstormed?";
-    "Already brainstormed?" -> "Invoke brainstorming skill" [label="no"];
+    "Already brainstormed?" -> "Invoke architect skill" [label="no"];
     "Already brainstormed?" -> "Might any skill apply?" [label="yes"];
-    "Invoke brainstorming skill" -> "Might any skill apply?";
+    "Invoke architect skill" -> "Might any skill apply?";
 
     "User message received" -> "Might any skill apply?";
     "Might any skill apply?" -> "Invoke Skill tool" [label="yes, even 1%"];
@@ -194,7 +194,7 @@ ML/AI/EE/FRONTEND WORK:
   oracle →
   [gradient | nexus | ironcore | prism] →
   → continue with feature-chain or debug-chain as appropriate
-  (multi-domain: run synthesis step in task-intake first)
+  (multi-domain: run synthesis step in oracle first)
 ```
 
 ## Skill Types

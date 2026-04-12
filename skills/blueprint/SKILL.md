@@ -17,7 +17,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "Running BLUEPRINT to create the implementation plan."
 
-**Context:** This should be run in a dedicated worktree (created by brainstorming skill).
+**Context:** This should be run in a dedicated worktree (created by architect skill).
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
@@ -53,7 +53,7 @@ This structure informs the task decomposition. Each task should produce self-con
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:phantom (recommended) or superpowers:exodus to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -144,7 +144,7 @@ SPARC = Specification → Pseudocode → Architecture → Refinement → Coding
 ```
 
 **SPARC is REQUIRED (not optional) when ANY of:**
-- Task complexity score ≥ 8 (from task-intake)
+- Task complexity score ≥ 8 (from oracle)
 - Security-critical code (auth, crypto, payments)
 - Architecture decisions (system design)
 - Cross-system integrations
@@ -200,14 +200,14 @@ After saving the plan, offer execution choice:
 
 **1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration
 
-**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
+**2. Inline Execution** - Execute tasks in this session using exodus, batch execution with checkpoints
 
 **Which approach?"**
 
 **If Subagent-Driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
+- **REQUIRED SUB-SKILL:** Use superpowers:phantom
 - Fresh subagent per task + two-stage review
 
 **If Inline Execution chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans
+- **REQUIRED SUB-SKILL:** Use superpowers:exodus
 - Batch execution with checkpoints for review

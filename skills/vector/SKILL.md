@@ -321,7 +321,7 @@ PLEASE:
 - Not security-critical (handled by auth middleware)
 ```
 
-**Model selection in subagent-driven-development:**
+**Model selection in phantom (subagent dispatch):**
 ```
 Per-task model selection:
 - Mechanical implementation (1-2 files, clear spec) → Tier 1

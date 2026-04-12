@@ -14,7 +14,7 @@ When invoked: assesses system type (RAG / agent / prompt / evaluation), loads th
 
 **Core principle:** LLM applications have unique failure modes — hallucination, prompt injection, context overflow, cost explosion. Engineer systems, not just prompts.
 
-**Announce at start:** "I'm using the NEXUS skill for AI application patterns."
+**Announce at start:** "Running NEXUS for AI application patterns."
 
 ---
 

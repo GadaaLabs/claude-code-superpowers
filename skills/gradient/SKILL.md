@@ -14,7 +14,7 @@ When invoked: assesses pipeline stage (data / training / serving / MLOps), loads
 
 **Core principle:** ML systems have unique failure modes — data drift, training-serving skew, silent degradation. Test data and models, not just code.
 
-**Announce at start:** "I'm using the GRADIENT skill for ML-specific patterns."
+**Announce at start:** "Running GRADIENT for ML-specific patterns."
 
 ---
 
