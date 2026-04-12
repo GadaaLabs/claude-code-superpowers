@@ -1,0 +1,12 @@
+# Memory Index
+# Loaded at every session start. Keep under 200 lines.
+# Format: - [Title](file.md) — specific one-line hook (not generic)
+#
+# Copy this file to: ~/.claude/projects/<project-hash>/memory/MEMORY.md
+# Find your project hash: ls ~/.claude/projects/
+
+- [User Profile](user_profile.md) — [your role + key expertise + what to frame differently]
+# - [Feedback: DB Tests](feedback_db_tests.md) — use real DB, never mocks; prod incident from mock/real divergence
+# - [Project: Auth Rewrite](project_auth.md) — compliance-driven, not tech-debt; deadline fixed by legal
+# - [Reference: Linear Bugs](reference_linear.md) — pipeline bugs tracked in Linear project "INGEST"
+# - [Pattern: Stripe Webhooks](pattern_backend_stripe.md) — always return 200 immediately, process async

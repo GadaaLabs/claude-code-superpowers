@@ -1,0 +1,40 @@
+# CLAUDE.md
+# This file is loaded at every Claude Code session start.
+# It provides project-specific context. Copy and customise for your project.
+
+## Project
+
+**[Your project name]** — [One sentence description of what it does and who uses it].
+Stack: [Language] · [Framework] · [Database] · [Key libraries]
+
+## Dev Commands
+
+```bash
+[your dev command]   # e.g. npm run dev
+[your build command] # e.g. npm run build
+[your test command]  # e.g. npm test
+[your lint command]  # e.g. npm run lint
+```
+
+## Environment Variables
+
+```
+KEY=value   # Description of what this does
+```
+
+## Architecture
+
+- `[dir]/` — [What lives here]
+- `[dir]/` — [What lives here]
+- `[dir]/` — [What lives here]
+
+## Key Conventions
+
+- [Convention 1 — e.g. "All API calls go through /api/v1 — never call external services from client"]
+- [Convention 2 — e.g. "Use CSS custom properties from globals.css, not Tailwind arbitrary values"]
+- [Convention 3 — e.g. "Monaco Editor must be dynamically imported with ssr: false"]
+
+## What Not To Touch
+
+- [File or system that should not be modified without caution]
+- [Reason why]

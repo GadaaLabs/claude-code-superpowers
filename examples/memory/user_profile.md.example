@@ -1,0 +1,20 @@
+---
+name: User Profile
+description: [your role, tech stack, expertise level — used to tailor explanations]
+type: user
+---
+
+[Your role]: [e.g. "Full-stack engineer at a fintech startup"]
+[Experience]: [e.g. "8 years Python backend, 2 years React/TypeScript"]
+[Domain]: [e.g. "Building ML pipelines and data-heavy dashboards"]
+
+Current project: [one sentence on what you're building right now]
+
+Preferences:
+- [e.g. "Concrete working code over theoretical explanations"]
+- [e.g. "Frame TypeScript generics in terms of Python type hints"]
+- [e.g. "Prefer explicit error handling over try/catch everywhere"]
+
+Areas I'm learning:
+- [e.g. "Kubernetes deployment patterns"]
+- [e.g. "RTOS real-time scheduling"]
