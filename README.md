@@ -2,28 +2,10 @@
 
 **Turn Claude Code from a reactive assistant into a proactive engineering partner.**
 
-A structured skill system for [Claude Code](https://claude.ai/code) that gives your AI persistent memory, domain expertise, disciplined process, and multi-agent coordination — so it compounds knowledge instead of starting from scratch every session.
+19 elite skills across 4 layers: discipline, domain expertise, intelligence, and coordination.
+Named for what they do — not what they are.
 
 Built and open-sourced by [GadaaLabs](https://gadaalabs.com) · [Full course →](https://gadaalabs.com/courses/claude-code-superpowers)
-
----
-
-## Why This Exists
-
-Default Claude Code is capable but structurally limited:
-
-- **No process** — starts implementing immediately, no complexity classification
-- **No domain awareness** — same reasoning for a one-line rename and a security overhaul
-- **No memory** — every session is session one; corrections disappear overnight
-
-This skill system addresses all three with four layers:
-
-| Layer | What it does |
-|-------|-------------|
-| **Discipline** | Task intake, TDD, systematic debugging, verification — process before code |
-| **Domain** | ML engineering, AI engineering, embedded systems, frontend — expertise on demand |
-| **Intelligence** | Auto-memory, learning from experience, context management — knowledge that compounds |
-| **Coordination** | Model routing, swarm coordination, multi-agent dispatch — scale to parallel execution |
 
 ---
 
@@ -31,165 +13,143 @@ This skill system addresses all three with four layers:
 
 **Requires:** [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) + Node.js 18+
 
-### Option A — One-line install (recommended)
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GadaaLabs/claude-code-superpowers/main/install.sh | bash
 ```
 
-### Option B — Manual
+Or clone and run:
 
 ```bash
-# 1. Clone this repo
 git clone https://github.com/GadaaLabs/claude-code-superpowers.git
-cd claude-code-superpowers
-
-# 2. Run the installer
-bash install.sh
-```
-
-### Option C — Use as Claude plugin (if superpowers plugin is installed)
-
-If you already have the official `superpowers` plugin, these skills extend it. Copy individual skill directories into your existing skills folder:
-
-```bash
-SKILLS_DIR=~/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills
-cp -r skills/ml-engineering "$SKILLS_DIR/"
-cp -r skills/ai-engineering "$SKILLS_DIR/"
-# ... etc
+cd claude-code-superpowers && bash install.sh
 ```
 
 ---
 
-## What's Included
+## The Skills
 
-### Discipline Skills
-| Skill | Purpose |
-|-------|---------|
-| `task-intake` | Classify complexity, select skill chain, assign model tier before ANY task |
-| `test-driven-development` | Red-Green-Refactor with AI, confidence gate, cross-language |
-| `systematic-debugging` | Evidence before hypothesis, bisect to root cause, canary tests |
-| `verification-before-completion` | Confidence scoring gate before marking work done |
-| `writing-plans` | SPARC-structured implementation plans for complex tasks |
-| `brainstorming` | Design-before-code: 2-3 approaches, trade-offs, spec document |
+### Discipline Layer — *Process before code*
 
-### Domain Skills
-| Skill | Domain | Patterns |
-|-------|--------|---------|
-| `ml-engineering` | ML pipelines, MLOps | data-pipeline, model-training, model-serving, mlops |
-| `ai-engineering` | RAG, agents, prompts, eval | rag-architecture, agent-patterns, prompt-engineering, llm-evaluation |
-| `embedded-systems` | ISRs, RTOS, state machines, hardware | state-machines, isr-safety, rtos-tasks, hardware-abstraction |
-| `frontend-excellence` | UI, a11y, Core Web Vitals, bundle | 67 UI styles, 25 chart types, WCAG 2.1 AA, CWV targets |
+| Skill | Invoke | What it does |
+|-------|--------|-------------|
+| **ORACLE** | `/oracle` | Classify complexity, select skill chain, assign model tier before ANY task |
+| **FORGE** | `/forge` | Red-Green-Refactor with AI — write the test before the code, always |
+| **HUNTER** | `/hunter` | Evidence before hypothesis, bisect to root cause, store pattern |
+| **SENTINEL** | `/sentinel` | Confidence gate before completion — HIGH / MEDIUM / LOW score |
+| **ARCHITECT** | `/architect` | Design-before-code: 2-3 approaches, trade-offs, spec document |
+| **BLUEPRINT** | `/blueprint` | SPARC-structured implementation plans for complex tasks |
 
-### Intelligence Skills
-| Skill | Purpose |
-|-------|---------|
-| `learning-from-experience` | Build a searchable ReasoningBank of solved patterns |
-| `context-management` | Track token budget, compress context, handoff to fresh session |
-| `codebase-onboarding` | Map unfamiliar codebases in 5 phases before starting work |
+### Domain Layer — *Expertise on demand*
 
-### Coordination Skills
-| Skill | Purpose |
-|-------|---------|
-| `model-routing` | Tier 0 (no LLM) → Tier 3 (Opus); route by complexity to cut costs 50-65% |
-| `swarm-coordination` | Parallel agent topologies: parallel, pipeline, hierarchical, mesh |
-| `dispatching-parallel-agents` | Dispatch subagents with isolated worktrees and context budgets |
-| `subagent-driven-development` | Subagent roles: implementer, reviewer, debugger, researcher |
-| `requesting-code-review` | Domain-aware code review with ML/AI/Embedded/Frontend/Security checklists |
+| Skill | Invoke | Domain | Lazy-loaded patterns |
+|-------|--------|--------|---------------------|
+| **GRADIENT** | `/gradient` | ML pipelines → MLOps | data-pipeline, model-training, model-serving, mlops |
+| **NEXUS** | `/nexus` | RAG · agents · prompts · eval | rag-architecture, agent-patterns, prompt-engineering, llm-evaluation |
+| **IRONCORE** | `/ironcore` | ISRs · RTOS · state machines · hardware | state-machines, isr-safety, rtos-tasks, hardware-abstraction |
+| **PRISM** | `/prism` | UI · accessibility · Core Web Vitals · bundle | 67 UI styles, 25 chart types, WCAG 2.1 AA, CWV targets |
+
+### Intelligence Layer — *Memory that compounds*
+
+| Skill | Invoke | What it does |
+|-------|--------|-------------|
+| **CHRONICLE** | `/chronicle` | Build a searchable ReasoningBank of solved patterns |
+| **HORIZON** | `/horizon` | Track token budget, compress context, handoff to fresh session |
+| **PATHFINDER** | `/pathfinder` | Map unfamiliar codebases in 5 phases before starting work |
+
+### Coordination Layer — *Scale to parallel execution*
+
+| Skill | Invoke | What it does |
+|-------|--------|-------------|
+| **VECTOR** | `/vector` | Route by complexity: Tier 0 (no LLM) → Tier 3 (Opus). Cuts costs 50-65% |
+| **LEGION** | `/legion` | Parallel agent topologies: parallel, pipeline, hierarchical, mesh |
+| **COMMANDER** | `/commander` | Dispatch subagents with isolated worktrees and context budgets |
+| **PHANTOM** | `/phantom` | Subagent roles: implementer, reviewer, debugger, researcher |
+| **TRIBUNAL** | `/tribunal` | Domain-aware code review: ML / AI / Embedded / Frontend / Security |
+| **ASCEND** | *(auto-loads)* | The meta-skill governing all others — loads at every session start |
 
 ---
 
 ## How It Works
 
-Skills are Markdown files (`SKILL.md`) that Claude Code loads on demand. They do not run automatically — they load into Claude's context when relevant.
+Skills are Markdown files (`SKILL.md`) that Claude Code loads on demand. Only relevant skills incur token cost.
 
 ```
 skills/
-  task-intake/
-    SKILL.md              ← ~700 tokens, loaded when task starts
-  ml-engineering/
-    SKILL.md              ← lean index, ~700 tokens
-    patterns/
-      data-pipeline.md    ← loaded only when working on data pipelines
-      model-training.md   ← loaded only when training models
-      model-serving.md    ← loaded only when working on serving
-      mlops.md            ← loaded only when working on MLOps
+  oracle/        SKILL.md  ← ~700 tokens, loads when task starts
+  gradient/      SKILL.md  ← lean index, ~700 tokens
+                 patterns/
+                   data-pipeline.md    ← loads only when you're working on pipelines
+                   model-training.md   ← loads only when training
+                   model-serving.md    ← loads only when working on serving
+                   mlops.md            ← loads only for MLOps work
 ```
-
-**Token cost:** Base skills are 600-900 tokens each. Pattern files are 400-800 tokens and load only when needed. The entire system is lazy-loaded — you only pay for what you use.
 
 ---
 
-## The Skill Chain System
+## The Chain System
 
-Every non-trivial task follows a chain. Task intake selects the chain automatically.
+ORACLE classifies every task and selects the right chain automatically:
 
 ```
-BUG:          learning-from-experience → systematic-debugging → TDD → verify → store pattern
-FEATURE:      task-intake → [domain skill] → brainstorming → writing-plans → implement → verify → review
-REFACTOR:     TDD (baseline tests) → writing-plans → implement → verify
-ARCHITECTURE: brainstorming → writing-plans (SPARC) → review → store decision
+BUG       →  CHRONICLE → HUNTER → FORGE → SENTINEL → CHRONICLE (store)
+FEATURE   →  ORACLE → [domain] → ARCHITECT → BLUEPRINT → PHANTOM → SENTINEL → TRIBUNAL
+REFACTOR  →  FORGE (baseline) → BLUEPRINT → SENTINEL
+ARCHITECT →  ARCHITECT → BLUEPRINT (SPARC) → TRIBUNAL → CHRONICLE
 ```
+
+---
+
+## Model Tier Routing (VECTOR)
+
+```
+Complexity 1-3  →  Tier 0  (no LLM)   mechanical: rename, sort, format
+Complexity 1-3  →  Tier 1  (Haiku)    simple lookups, single-file edits
+Complexity 4-6  →  Tier 2  (Sonnet)   standard development — the default
+Complexity 7-9  →  Tier 2→3 (Sonnet → Opus)  escalate if stuck
+Complexity 10   →  Tier 3  (Opus)     security-critical, architecture decisions
+```
+Systematic tier routing cuts API costs **50-65%** vs treating everything as Tier 3.
 
 ---
 
 ## The Auto-Memory System
 
-Skills work with Claude Code's auto-memory at `~/.claude/projects/<hash>/memory/`.
+Skills work with Claude Code's persistent memory at `~/.claude/projects/<hash>/memory/`.
 
-Four memory types persist across sessions:
+Four memory types:
 
-```markdown
-user      — who you are, your expertise, working preferences
-feedback  — corrections Claude made, validated approaches (with Why + How to apply)
-project   — current initiatives, architecture decisions, constraints
-reference — where to find external information (Linear, Grafana, etc.)
+```
+user      — who you are, expertise, working preferences
+feedback  — corrections + validated approaches (Why + How to apply)
+project   — active initiatives, architecture decisions, constraints
+reference — where to find external information
 ```
 
-Example `MEMORY.md` index:
+Example index (`MEMORY.md`):
 ```markdown
-# Memory Index
 - [User Profile](user_profile.md) — Python engineer, new to React; frame frontend in Python terms
-- [Feedback: No Mocks on DB Tests](feedback_db_tests.md) — use real DB, mocks caused prod incident
-- [Project: Auth Rewrite](project_auth.md) — compliance-driven, deadline fixed by legal schedule
-- [Reference: Linear Bugs](reference_linear.md) — pipeline bugs in "INGEST" project
+- [CHRONICLE: Stripe Webhooks](pattern_backend_stripe.md) — return 200 immediately, process async
+- [FORGE: No DB Mocks](feedback_db_tests.md) — use real DB; mocks caused prod incident
+- [Project: Auth Rewrite](project_auth.md) — compliance-driven; deadline fixed by legal
 ```
-
-See `examples/memory/` for templates.
-
----
-
-## Model Tier Routing
-
-The `model-routing` skill assigns Claude model tiers by task complexity, cutting API costs 50-65%:
-
-| Complexity | Tier | Model | Use for |
-|-----------|------|-------|---------|
-| 1-3 | 0 | None (direct) | Mechanical: rename, sort, format |
-| 1-3 | 1 | Haiku | Simple lookups, single-file edits |
-| 4-6 | 2 | Sonnet | Standard development (default) |
-| 7-9 | 2→3 | Sonnet → Opus | Complex tasks, escalate if stuck |
-| 10 | 3 | Opus | Security-critical, architecture decisions |
 
 ---
 
 ## Domain Pattern Files
 
-Each domain skill has lazy-loaded pattern files for specific subtasks:
-
-### ML Engineering patterns
-- `data-pipeline.md` — schema validation, KS drift test, covariate shift, leakage check
-- `model-training.md` — Bayesian hyperparameter search, early stopping, checkpointing, ablation
+### GRADIENT (ML Engineering)
+- `data-pipeline.md` — schema validation, KS drift test, covariate shift AUC, leakage check
+- `model-training.md` — Bayesian hyperparam search, early stopping, checkpointing, ablation
 - `model-serving.md` — input validation, P99 latency test, fallback behavior, calibration
-- `mlops.md` — versioning config, A/B test setup, PSI drift monitoring, rollback triggers
+- `mlops.md` — versioning config, A/B test, PSI drift monitoring, rollback triggers
 
-### AI Engineering patterns
-- `rag-architecture.md` — chunking by doc type, embedding selection matrix, hybrid retrieval, reranking
+### NEXUS (AI Engineering)
+- `rag-architecture.md` — chunking by doc type, embedding matrix, hybrid retrieval, reranking
 - `agent-patterns.md` — ReAct, Plan-Execute, Reflection, Multi-Agent Debate, Tool Routing
-- `prompt-engineering.md` — iterative refinement loop, few-shot selection, format enforcement, injection defense
+- `prompt-engineering.md` — iterative refinement, few-shot selection, format enforcement, injection defense
 - `llm-evaluation.md` — correctness metrics, hallucination detection, latency/cost tracking, human preference
 
-### Embedded Systems patterns
+### IRONCORE (Embedded Systems)
 - `state-machines.md` — HSM pattern, transition table, guard conditions, coverage testing
 - `isr-safety.md` — minimal ISR work, lock-free SPSC queue, memory barriers
 - `rtos-tasks.md` — Rate Monotonic Scheduling, stack watermark, IPC, WCRT analysis
@@ -199,29 +159,18 @@ Each domain skill has lazy-loaded pattern files for specific subtasks:
 
 ## Usage
 
-Once installed, skills activate through Claude Code's `Skill` tool or via `/skill-name` slash commands.
+Once installed, invoke skills by name:
 
-**Start every non-trivial task:**
 ```
-/task-intake
-```
-
-**Invoke a domain skill:**
-```
-/ml-engineering
-/ai-engineering
-/embedded-systems
-/frontend-excellence
-```
-
-**Load a pattern file** (Claude does this automatically when relevant, or you can ask):
-```
-Load the RAG architecture patterns for this retrieval implementation
-```
-
-**After completing a task:**
-```
-/learning-from-experience  (to store the pattern)
+/oracle          ← start EVERY non-trivial task here
+/gradient        ← working on ML pipelines or MLOps
+/nexus           ← building RAG, agents, or prompts
+/ironcore        ← embedded, firmware, or hardware
+/prism           ← frontend, UI, or accessibility
+/hunter          ← debugging a hard problem
+/forge           ← new feature or function (TDD)
+/chronicle       ← store a solved pattern
+/legion          ← parallel work across 3+ independent files
 ```
 
 ---
@@ -233,20 +182,20 @@ Create a `SKILL.md` in any subdirectory under `skills/`:
 ```markdown
 ---
 name: your-skill-name
-description: Specific description of when this skill applies — used for relevance matching
+description: Specific description of when this applies — used for relevance matching
 type: process | domain | implementation
 ---
 
-# Your Skill Title
+# YOUR SKILL NAME
 
 ## Overview
-Core principle and announcement line.
+Core principle. Announce: "Using [name] for [purpose]."
 
 ## Entry Point — First 5 Minutes
-Assessment question before applying any patterns.
+Assessment before applying any patterns. Never dump everything at once.
 
 ## Section 1
-Patterns, checklists, configurations.
+...
 
 ## Red Flags
 **Never:** ...
@@ -256,7 +205,7 @@ Patterns, checklists, configurations.
 - [ ] Verifiable completion criterion
 ```
 
-Run `bash install.sh` again to pick up new skills. See `CONTRIBUTING.md` for contribution guidelines.
+Run `bash install.sh` again to pick up new skills. See `CONTRIBUTING.md`.
 
 ---
 
@@ -265,56 +214,51 @@ Run `bash install.sh` again to pick up new skills. See `CONTRIBUTING.md` for con
 ```
 claude-code-superpowers/
   README.md
-  install.sh              ← automated setup script
-  CONTRIBUTING.md         ← how to add skills and patterns
+  install.sh              ← one-line installer, auto-detects superpowers plugin
+  CONTRIBUTING.md         ← skill contribution guide with quality bar
   skills/
-    task-intake/          ← classify before you code
-    test-driven-development/
-    systematic-debugging/
-    verification-before-completion/
-    brainstorming/
-    writing-plans/
-    ml-engineering/       ← + patterns/
-    ai-engineering/       ← + patterns/
-    embedded-systems/     ← + patterns/
-    frontend-excellence/
-    learning-from-experience/
-    context-management/
-    codebase-onboarding/
-    model-routing/
-    swarm-coordination/
-    dispatching-parallel-agents/
-    subagent-driven-development/
-    requesting-code-review/
-    using-superpowers/
+    oracle/               ← ORACLE: classify before you code
+    forge/                ← FORGE: test-driven development
+    hunter/               ← HUNTER: systematic debugging
+    sentinel/             ← SENTINEL: verification gate
+    architect/            ← ARCHITECT: design before building
+    blueprint/            ← BLUEPRINT: structured plans
+    gradient/             ← GRADIENT: ML engineering + patterns/
+    nexus/                ← NEXUS: AI engineering + patterns/
+    ironcore/             ← IRONCORE: embedded systems + patterns/
+    prism/                ← PRISM: frontend excellence
+    chronicle/            ← CHRONICLE: learning & pattern bank
+    horizon/              ← HORIZON: context management
+    pathfinder/           ← PATHFINDER: codebase onboarding
+    vector/               ← VECTOR: model routing
+    legion/               ← LEGION: swarm coordination
+    commander/            ← COMMANDER: parallel agent dispatch
+    phantom/              ← PHANTOM: subagent execution
+    tribunal/             ← TRIBUNAL: domain-aware code review
+    ascend/               ← ASCEND: the meta-skill (auto-loads)
   examples/
-    CLAUDE.md.example     ← template for project-specific Claude instructions
+    CLAUDE.md.example
     memory/
-      MEMORY.md.example   ← memory index template
+      MEMORY.md.example
       user_profile.md.example
       feedback_example.md
-      project_example.md
 ```
 
 ---
 
 ## Full Course
 
-The complete course on how to use this system — 12 lessons from installation to building custom skills — is free at:
+12-lesson free course — installation through custom skills:
 
 **[gadaalabs.com/courses/claude-code-superpowers](https://gadaalabs.com/courses/claude-code-superpowers)**
-
-Covers: task intake, TDD with AI, systematic debugging, ML/AI/embedded/frontend domain skills, auto-memory, learning from experience, multi-agent swarms, and building custom skills.
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome for:
-- New domain skills (DevOps, security, data engineering, mobile)
-- New pattern files for existing skills
-- Improved entry point assessments
-- Community-contributed custom skills
+PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+New domain skills needed: DevOps/Kubernetes, security engineering, data engineering, mobile.
 
 ---
 
