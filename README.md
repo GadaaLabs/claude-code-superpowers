@@ -2,7 +2,7 @@
 
 **Turn Claude Code from a reactive assistant into a proactive engineering partner.**
 
-19 elite skills across 4 layers: discipline, domain expertise, intelligence, and coordination.
+24 elite skills across 5 layers: discipline, domain expertise, intelligence, coordination, and execution.
 Named for what they do — not what they are.
 
 Built and open-sourced by [GadaaLabs](https://gadaalabs.com) · [Full course →](https://gadaalabs.com/courses/claude-code-superpowers)
@@ -67,6 +67,16 @@ cd claude-code-superpowers && bash install.sh
 | **TRIBUNAL** | `/tribunal` | Domain-aware code review: ML / AI / Embedded / Frontend / Security |
 | **ASCEND** | *(auto-loads)* | The meta-skill governing all others — loads at every session start |
 
+### Execution Layer — *Safe, verified delivery*
+
+| Skill | Invoke | What it does |
+|-------|--------|-------------|
+| **VAULT** | `/vault` | Isolated git worktrees — safe workspace before any implementation begins |
+| **SEAL** | `/seal` | Structured branch completion: verify tests → merge / PR / keep / discard |
+| **EXODUS** | `/exodus` | Execute plans in a completely fresh isolated session — zero context pollution |
+| **ARBITER** | `/arbiter` | Receive code review with technical rigor — verify before implementing, push back when wrong |
+| **SCULPTOR** | `/sculptor` | TDD applied to skill creation — no skill ships without a failing test first |
+
 ---
 
 ## How It Works
@@ -92,9 +102,11 @@ ORACLE classifies every task and selects the right chain automatically:
 
 ```
 BUG       →  CHRONICLE → HUNTER → FORGE → SENTINEL → CHRONICLE (store)
-FEATURE   →  ORACLE → [domain] → ARCHITECT → BLUEPRINT → PHANTOM → SENTINEL → TRIBUNAL
-REFACTOR  →  FORGE (baseline) → BLUEPRINT → SENTINEL
+FEATURE   →  ORACLE → [domain] → ARCHITECT → BLUEPRINT → VAULT → PHANTOM → SENTINEL → TRIBUNAL → SEAL
+REFACTOR  →  FORGE (baseline) → BLUEPRINT → VAULT → EXODUS → SENTINEL → SEAL
 ARCHITECT →  ARCHITECT → BLUEPRINT (SPARC) → TRIBUNAL → CHRONICLE
+REVIEW    →  TRIBUNAL (request) → ARBITER (receive) → SENTINEL
+NEW SKILL →  SCULPTOR (TDD for skills)
 ```
 
 ---
@@ -236,6 +248,13 @@ claude-code-superpowers/
     phantom/              ← PHANTOM: subagent execution
     tribunal/             ← TRIBUNAL: domain-aware code review
     ascend/               ← ASCEND: the meta-skill (auto-loads)
+    vault/                ← VAULT: isolated git worktrees
+    seal/                 ← SEAL: structured branch completion
+    exodus/               ← EXODUS: isolated session plan execution
+    arbiter/              ← ARBITER: code review reception
+    sculptor/             ← SCULPTOR: TDD for skill creation
+                 patterns/
+                   persuasion-principles.md
   examples/
     CLAUDE.md.example
     memory/
