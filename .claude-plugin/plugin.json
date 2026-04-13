@@ -1,0 +1,24 @@
+{
+  "name": "claude-code-superpowers",
+  "description": "24 elite skills across 5 layers: discipline, domain expertise, intelligence, coordination, and execution. Turn Claude Code into a proactive engineering partner.",
+  "version": "1.0.0",
+  "author": {
+    "name": "GadaaLabs",
+    "email": "hello@gadaalabs.com"
+  },
+  "homepage": "https://github.com/GadaaLabs/claude-code-superpowers",
+  "repository": "https://github.com/GadaaLabs/claude-code-superpowers",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "tdd",
+    "debugging",
+    "collaboration",
+    "best-practices",
+    "workflows",
+    "domain-expertise",
+    "ml",
+    "embedded",
+    "ai-engineering"
+  ]
+}
