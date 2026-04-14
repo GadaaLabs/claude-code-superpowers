@@ -12,6 +12,14 @@ curl -fsSL https://raw.githubusercontent.com/GadaaLabs/claude-code-on-steroids/m
 
 ---
 
+> **If this system saved you hours of debugging, reduced your API bill, or closed a gap you were struggling with — consider buying me a coffee.**
+>
+> [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support%20this%20work-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/GadaaLabs)
+>
+> You can also open a PR, star the repo, or share it. All of it helps.
+
+---
+
 ## How This Compares to the Original
 
 | | [obra/superpowers](https://github.com/obra/superpowers) | **Claude Code on Steroids** |
@@ -29,11 +37,30 @@ curl -fsSL https://raw.githubusercontent.com/GadaaLabs/claude-code-on-steroids/m
 
 ---
 
+## The Token Burn Problem — Why This Exists
+
+The biggest pain point in Claude Code is not missing workflows. It is token burn.
+
+**obra/superpowers gives you 14 structured workflows. It gives you zero memory, zero context management, and zero cost routing.** Every session restart costs 5,000–15,000 tokens to re-establish context. Every repeated debugging problem costs 8,000–15,000 tokens to re-investigate from scratch. Every mechanical task routes through the LLM when it should hit a shell tool.
+
+This is what was engineered closed:
+
+| Scenario | obra/superpowers | Claude Code on Steroids | Savings |
+|----------|-----------------|------------------------|---------|
+| Debug: 2nd encounter of same problem | 8,000–15,000 tok (full re-investigation) | ~50 tok (chronicle cache hit) | **up to 99%** |
+| Context window limit hit | 5,000–15,000 tok (crash + restart) | 0 tok (horizon compresses) | **100%** |
+| Mechanical task (rename, format, import) | 500–2,000 tok (LLM call) | 0 tok (vector Tier 0 → shell) | **100%** |
+| New codebase exploration | 30,000–60,000 tok (random reads) | 8,000–12,000 tok (pathfinder 5-phase) | **60–80%** |
+| Session bootstrap | 1,023 tok | 1,484 tok | –461 tok overhead |
+| Debug: 1st encounter | 1,955 tok | 4,246 tok | –2,291 tok investment |
+
+The first two scenarios cost more upfront. Every subsequent encounter pays the investment back. By day 2 of any engineering sprint, the cumulative burn has already crossed over in your favor.
+
+---
+
 ## The Skills — All 24
 
 ### Evolved from obra originals (12 skills)
-
-These skills exist in obra but have been significantly expanded. Key GadaaLabs additions are marked.
 
 | Skill | obra original | What was improved |
 |-------|--------------|-------------------|
@@ -67,7 +94,7 @@ These skills exist in obra but have been significantly expanded. Key GadaaLabs a
 
 ### Restructured from obra (2 → 3 skills)
 
-obra's `executing-plans` and `subagent-driven-development` were split and restructured into:
+obra's `executing-plans` and `subagent-driven-development` were split into:
 
 | Skill | What it does |
 |-------|-------------|
@@ -78,7 +105,7 @@ obra's `executing-plans` and `subagent-driven-development` were split and restru
 
 ## The Override Infrastructure
 
-Both obra and the official plugin distribution have the same gap: when the plugin updates, any pinned customizations are overwritten.
+Both obra and the official plugin distribution share the same gap: plugin updates overwrite any customizations.
 
 Our installer adds `apply.sh` + a `SessionStart` hook to `~/.claude/settings.json`:
 
@@ -92,13 +119,11 @@ Session opens
 
 **Plugin updates to any future version?** Next session, your pinned versions win automatically. Zero maintenance.
 
-Skills pinned by the override system: `ascend` `blueprint` `chronicle` `commander` `forge` `legion` `pathfinder` `phantom` `vector`
+Skills pinned: `ascend` `blueprint` `chronicle` `commander` `forge` `legion` `pathfinder` `phantom` `vector`
 
 ---
 
 ## The 6 Workflow Chains (in ascend)
-
-Instead of manually reasoning which skills to combine, ascend gives you pre-built chains:
 
 ```
 DEBUG     →  chronicle → hunter → forge → sentinel → oracle → chronicle(store)
@@ -124,26 +149,14 @@ LONG SESSION → horizon → continue or fresh handoff
 ## Quick Start After Install
 
 ```bash
-# In any project
 cd your-project && claude
 
-# Start every non-trivial task with:
-/oracle
-
-# Working on ML?
-/gradient
-
-# Building a RAG system?
-/nexus
-
-# Debugging a hard problem?
-/hunter
-
-# New codebase you've never seen?
-/pathfinder
-
-# Writing a feature?
-/forge   # TDD first, always
+/oracle        # Start every non-trivial task here
+/gradient      # ML work
+/nexus         # RAG / agent work
+/hunter        # Hard debugging
+/pathfinder    # Unfamiliar codebase
+/forge         # Writing tests — TDD first, always
 ```
 
 ---
@@ -156,11 +169,22 @@ cd your-project && claude
 
 ---
 
+## Support This Work
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/GadaaLabs)
+
+If this closed a gap in your workflow, reduced your API costs, or helped you ship something — a coffee keeps this maintained and expanded.
+
+Other ways to help:
+- **Star the repo** — helps others find it
+- **Submit a PR** — DevOps, security, and mobile skills are the priority gaps
+- **Share your results** — post what changed, tag what you built
+
+---
+
 ## Contributing
 
-PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Priority needs: DevOps/Kubernetes skill, security engineering skill, mobile engineering skill.
+PRs welcome. Priority gaps: DevOps/Kubernetes skill, security engineering skill, mobile engineering skill.
 
 ---
 
