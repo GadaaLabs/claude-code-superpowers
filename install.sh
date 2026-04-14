@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code Superpowers — Installer
-# https://github.com/GadaaLabs/claude-code-superpowers
+# https://github.com/GadaaLabs/claude-code-on-steroids
 set -euo pipefail
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ header()  { echo -e "\n${BOLD}$*${RESET}"; }
 # ─── Banner ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}${CYAN}  ║   Claude Code Superpowers Installer   ║${RESET}"
+echo -e "${BOLD}${CYAN}  ║   Claude Code on Steroids — Installer   ║${RESET}"
 echo -e "${BOLD}${CYAN}  ║        by GadaaLabs.com               ║${RESET}"
 echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════╝${RESET}"
 echo ""
@@ -38,7 +38,7 @@ else
   info "Downloading skills from GitHub..."
   TMP_DIR="$(mktemp -d)"
   trap "rm -rf $TMP_DIR" EXIT
-  curl -fsSL "https://github.com/GadaaLabs/claude-code-superpowers/archive/refs/heads/main.tar.gz" \
+  curl -fsSL "https://github.com/GadaaLabs/claude-code-on-steroids/archive/refs/heads/main.tar.gz" \
     | tar -xz -C "$TMP_DIR" --strip-components=1
   SOURCE_DIR="$TMP_DIR"
   success "Downloaded"
@@ -194,6 +194,6 @@ echo -e "  1. Open your project:  ${CYAN}cd your-project && claude${RESET}"
 echo -e "  2. Run task intake:    ${CYAN}/task-intake${RESET}"
 echo -e "  3. Try a domain skill: ${CYAN}/ml-engineering${RESET}  or  ${CYAN}/ai-engineering${RESET}"
 echo ""
-echo -e "  ${DIM}Full course (free): gadaalabs.com/courses/claude-code-superpowers${RESET}"
-echo -e "  ${DIM}Docs & issues:      github.com/GadaaLabs/claude-code-superpowers${RESET}"
+echo -e "  ${DIM}Full course (free): gadaalabs.com/courses/claude-code-on-steroids${RESET}"
+echo -e "  ${DIM}Docs & issues:      github.com/GadaaLabs/claude-code-on-steroids${RESET}"
 echo ""
