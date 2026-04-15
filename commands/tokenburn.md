@@ -2,21 +2,24 @@
 description: "Show a full token & cost analytics dashboard — by day, project, model, activity, tools, and shell commands"
 ---
 
-Run this exact command in your Bash tool:
+Tell the user to run this command directly in their Claude Code prompt (the `!` prefix runs it in the real terminal with full color support):
 
-```
-COLUMNS=120 FORCE_COLOR=1 tokenburn report --period PERIOD 2>&1 | cat
-```
+For the period they requested, give them the exact command to type:
 
-Replace PERIOD based on the user's argument:
-- No args or `today`     → `today`
-- `week` or `7d`         → `week`
-- `30d` or `30days`      → `30days`
-- `month`                → `month`
+- No args or `week`  → `! tokenburn report --period week`
+- `today`            → `! tokenburn report --period today`
+- `30d` or `30days`  → `! tokenburn report --period 30days`
+- `month`            → `! tokenburn report --period month`
 
 Default when no argument given: `week`
 
-**IMPORTANT:** Do NOT copy or repeat the command output in your text response. The Bash tool output panel renders the colors automatically. After the command runs, only say: `TokenBurn rendered above ↑`
+Tell them: **Type this in your Claude Code prompt** (not as a message to Claude — type it directly into the prompt bar and press Enter):
 
-If `tokenburn` is not found in PATH, tell the user:
-"tokenburn is not installed. Re-run the installer: bash ~/.claude/plugins/superpowers-overrides/install.sh"
+```
+! tokenburn report --period week
+```
+
+Explain that the `!` prefix runs commands directly in the terminal with full TTY support, which is what gives tokenburn its colors and layout. Running it through Claude's Bash tool strips the colors.
+
+If `tokenburn` is not found, tell the user:
+"tokenburn is not installed. Re-run the installer: `bash ~/.claude/plugins/superpowers-overrides/install.sh`"
