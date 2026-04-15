@@ -1,18 +1,25 @@
 ---
-description: "Show a breakdown of token usage and cost by day, project, model, tool, and shell command"
+description: "Interactive token & cost analytics dashboard — by day, project, model, activity, tools, and MCP"
 ---
 
-Run the tokenburn analytics script and display the output exactly as returned.
+Run the tokenburn analytics dashboard and display the output.
 
 Execute this command in your Bash tool:
 ```
-python3 ~/.claude/plugins/superpowers-overrides/scripts/tokenburn.py $ARGS
+tokenburn report --period PERIOD
 ```
 
-Where `$ARGS` comes from the arguments the user passed to `/tokenburn`:
-- No args or `today`  → `--today`
-- `week`              → `--week`
-- `30d` or `30days`  → `--30d`
-- `month`             → `--month`
+Map the user's argument to PERIOD:
+- No args, `today`          → `today`
+- `week` or `7d`           → `week`
+- `30d` or `30days`        → `30days`
+- `month`                  → `month`
 
-Display the full output verbatim — do not summarize, trim, or reformat it. Do not add commentary before or after unless the user asks a follow-up question.
+Default period if nothing specified: `week`
+
+Display the full output verbatim — do not summarize, trim, or reformat it.
+
+If `tokenburn` is not found, tell the user to run:
+  bash ~/.claude/plugins/superpowers-overrides/install.sh
+
+Do not add commentary before or after the output unless the user asks a follow-up question.

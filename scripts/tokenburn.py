@@ -1,495 +1,728 @@
 #!/usr/bin/env python3
 """
 tokenburn — Claude Code token & cost analytics
-Usage: python3 tokenburn.py [--today|--week|--30d|--month]
+Interactive TUI (curses) when run in a terminal.
+Static ANSI output when piped (e.g. via Claude's Bash tool).
+
+Keys: 1 today  2 week  3 month  q quit
+Direct use: python3 tokenburn.py [today|week|month]
 """
 
+import curses
 import json
 import os
 import sys
 import glob
+import math
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
-import re
-import shutil
 
-# ── Pricing per million tokens ──────────────────────────────────────────────
+# ── Pricing (per million tokens) ─────────────────────────────────────────────
 PRICING = {
-    'claude-opus-4-6':              {'input': 15.00, 'output': 75.00, 'cache_write': 18.75, 'cache_read': 1.50},
-    'claude-opus-4-5':              {'input': 15.00, 'output': 75.00, 'cache_write': 18.75, 'cache_read': 1.50},
-    'claude-sonnet-4-6':            {'input':  3.00, 'output': 15.00, 'cache_write':  3.75, 'cache_read': 0.30},
-    'claude-sonnet-4-5':            {'input':  3.00, 'output': 15.00, 'cache_write':  3.75, 'cache_read': 0.30},
-    'claude-haiku-4-5':             {'input':  0.80, 'output':  4.00, 'cache_write':  1.00, 'cache_read': 0.08},
-    'claude-haiku-4-5-20251001':    {'input':  0.80, 'output':  4.00, 'cache_write':  1.00, 'cache_read': 0.08},
+    'claude-opus-4-6':           {'input': 15.00, 'output': 75.00, 'cw': 18.75, 'cr': 1.50},
+    'claude-opus-4-5':           {'input': 15.00, 'output': 75.00, 'cw': 18.75, 'cr': 1.50},
+    'claude-sonnet-4-6':         {'input':  3.00, 'output': 15.00, 'cw':  3.75, 'cr': 0.30},
+    'claude-sonnet-4-5':         {'input':  3.00, 'output': 15.00, 'cw':  3.75, 'cr': 0.30},
+    'claude-haiku-4-5':          {'input':  0.80, 'output':  4.00, 'cw':  1.00, 'cr': 0.08},
+    'claude-haiku-4-5-20251001': {'input':  0.80, 'output':  4.00, 'cw':  1.00, 'cr': 0.08},
 }
-DEFAULT_PRICING = {'input': 3.00, 'output': 15.00, 'cache_write': 3.75, 'cache_read': 0.30}
+DEFAULT_P = {'input': 3.00, 'output': 15.00, 'cw': 3.75, 'cr': 0.30}
 
-# ── ANSI ────────────────────────────────────────────────────────────────────
-R   = '\033[0m'
-B   = '\033[1m'
-DIM = '\033[2m'
-YEL = '\033[33m'
-CYN = '\033[36m'
-GRN = '\033[32m'
-MAG = '\033[35m'
-BLU = '\033[34m'
-RED = '\033[31m'
-WHT = '\033[97m'
-ORG = '\033[38;5;214m'
+PERIODS      = ['today', 'week', 'month']
+PERIOD_LABEL = {'today': 'Today', 'week': '7 Days', 'month': 'This Month'}
 
-NO_COLOR = not sys.stdout.isatty()
+# Activity → color pair (defined in setup_colors)
+ACTIVITY_CP = {
+    'Conversation':  'dim',
+    'Coding':        'cyan',
+    'Exploration':   'cyan',
+    'Planning':      'green',
+    'Brainstorming': 'magenta',
+    'Delegation':    'yellow',
+    'Debugging':     'orange',
+    'Feature Dev':   'green',
+    'General':       'dim',
+    'Testing':       'green',
+    'Refactoring':   'green',
+    'Build/Deploy':  'green',
+}
 
-def c(code, text):
-    return text if NO_COLOR else f'{code}{text}{R}'
-
-# ── Helpers ─────────────────────────────────────────────────────────────────
+# ── Data helpers ──────────────────────────────────────────────────────────────
 
 def calc_cost(model, usage):
-    p = PRICING.get(model, DEFAULT_PRICING)
+    p = PRICING.get(model, DEFAULT_P)
     M = 1_000_000
-    return (
-        usage.get('input_tokens', 0)                 * p['input']       / M +
-        usage.get('output_tokens', 0)                * p['output']      / M +
-        usage.get('cache_creation_input_tokens', 0)  * p['cache_write'] / M +
-        usage.get('cache_read_input_tokens', 0)      * p['cache_read']  / M
-    )
+    return (usage.get('input_tokens', 0)                * p['input']  / M +
+            usage.get('output_tokens', 0)               * p['output'] / M +
+            usage.get('cache_creation_input_tokens', 0) * p['cw']     / M +
+            usage.get('cache_read_input_tokens', 0)     * p['cr']     / M)
 
-def fmt_cost(cost):
-    if cost == 0:
-        return '$0.0000'
-    if cost >= 100:
-        return f'${cost:,.0f}'
-    if cost >= 1:
-        return f'${cost:.2f}'
-    return f'${cost:.4f}'
-
-def period_start(arg):
+def period_since(period):
     now = datetime.now(timezone.utc)
-    if arg == '--week':
-        return now - timedelta(days=7)
-    if arg == '--30d':
-        return now - timedelta(days=30)
-    if arg == '--month':
-        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # default: today
+    if period == 'week':  return now - timedelta(days=7)
+    if period == 'month': return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
+def fmt_cost(cost):
+    if cost == 0:      return '$0.0000'
+    if cost >= 10000:  return f'${cost:,.0f}'
+    if cost >= 1000:   return f'${cost:,.0f}'
+    if cost >= 100:    return f'${cost:.0f}'
+    if cost >= 1:      return f'${cost:.2f}'
+    return f'${cost:.4f}'
+
+def fmt_num(n):
+    if n >= 1_000_000_000: return f'{n/1_000_000_000:.1f}B'
+    if n >= 1_000_000:     return f'{n/1_000_000:.1f}M'
+    if n >= 1_000:         return f'{n/1_000:.1f}K'
+    return str(n)
+
 def project_label(cwd):
-    if not cwd:
-        return 'unknown'
-    home = os.path.expanduser('~')
-    path = cwd.replace(home, '~')
-    parts = [p for p in path.split('/') if p]
-    return '/'.join(parts[-2:]) if len(parts) >= 2 else path
+    if not cwd: return 'unknown'
+    parts = cwd.replace(os.path.expanduser('~'), '~').split('/')
+    return '/'.join(parts[-2:]) if len(parts) >= 2 else cwd
 
-def bar_chart(value, max_value, width=14):
-    """Unicode gradient bar."""
-    if max_value == 0 or value == 0:
-        return ' ' * width
-    ratio = value / max_value
-    total_eighths = int(ratio * width * 8)
-    full_blocks = total_eighths // 8
-    remainder = total_eighths % 8
-    blocks = ' ▏▎▍▌▋▊▉█'
-    s = '█' * full_blocks
-    if full_blocks < width:
-        s += blocks[remainder]
-        s += ' ' * (width - full_blocks - 1)
-    s = s[:width]
-    if NO_COLOR:
-        return s
-    if ratio > 0.65:
-        clr = ORG
-    elif ratio > 0.30:
-        clr = YEL
-    else:
-        clr = BLU
-    return f'{clr}{s}{R}'
+def model_label(m):
+    return {
+        'claude-opus-4-6': 'Opus 4.6',   'claude-opus-4-5': 'Opus 4.5',
+        'claude-sonnet-4-6': 'Sonnet 4.6', 'claude-sonnet-4-5': 'Sonnet 4.5',
+        'claude-haiku-4-5': 'Haiku 4.5',  'claude-haiku-4-5-20251001': 'Haiku 4.5',
+    }.get(m, m)
 
-def extract_bash_cmd(input_dict):
-    """Get the first word of a bash command."""
-    cmd = input_dict.get('command', '') if isinstance(input_dict, dict) else ''
-    if not cmd:
-        return None
-    first = cmd.strip().split()[0] if cmd.strip() else None
-    if first in ('sudo', 'env', 'npx', 'yarn', 'pnpm'):
-        parts = cmd.strip().split()
-        return parts[1] if len(parts) > 1 else first
-    return first
+def classify(tools, bash_cmds):
+    ts  = set(tools)
+    bc  = ' '.join(bash_cmds).lower()
+    if 'Agent' in ts: return 'Delegation'
+    if any(k in bc for k in ['jest','pytest','vitest','mocha','rspec']): return 'Testing'
+    if any(k in bc for k in ['deploy','vercel','docker','heroku','npm run build','yarn build']): return 'Build/Deploy'
+    if any(t in ts for t in ['Edit','Write']) and any(t in ts for t in ['Read','Bash','Grep']): return 'Coding'
+    if any(t in ts for t in ['Edit','Write']): return 'Feature Dev'
+    if any(t in ts for t in ['Read','Grep','Glob']) and not ts & {'Edit','Write'}: return 'Exploration'
+    if 'WebSearch' in ts or 'WebFetch' in ts: return 'Exploration'
+    if 'Bash' in ts: return 'Debugging'
+    if not ts: return 'Conversation'
+    return 'General'
 
-def model_label(model):
-    aliases = {
-        'claude-sonnet-4-6': 'Sonnet 4.6',
-        'claude-sonnet-4-5': 'Sonnet 4.5',
-        'claude-haiku-4-5':  'Haiku 4.5',
-        'claude-haiku-4-5-20251001': 'Haiku 4.5',
-        'claude-opus-4-6':   'Opus 4.6',
-        'claude-opus-4-5':   'Opus 4.5',
-    }
-    return aliases.get(model, model)
+# ── Data loading ──────────────────────────────────────────────────────────────
 
-def classify_activity(tools, bash_cmds):
-    """Heuristic session activity classification."""
-    tool_set = set(tools)
-    bash_text = ' '.join(bash_cmds).lower()
-    if 'Agent' in tool_set:
-        return 'Delegation'
-    if any(k in bash_text for k in ['jest', 'pytest', 'vitest', 'test', 'mocha', 'rspec']):
-        return 'Testing'
-    if any(k in bash_text for k in ['deploy', 'vercel', 'docker', 'fly ', 'heroku', 'npm run build', 'yarn build']):
-        return 'Build/Deploy'
-    if any(t in tool_set for t in ['Edit', 'Write']) and any(t in tool_set for t in ['Read', 'Bash', 'Grep']):
-        return 'Coding'
-    if any(t in tool_set for t in ['Edit', 'Write']):
-        return 'Feature Dev'
-    if any(t in tool_set for t in ['Read', 'Grep', 'Glob']) and 'Edit' not in tool_set:
-        return 'Exploration'
-    if 'Bash' in tool_set:
-        return 'Debugging'
-    if 'WebSearch' in tool_set or 'WebFetch' in tool_set:
-        return 'Exploration'
-    return 'Conversation'
+def load_data(period):
+    since = period_since(period)
+    files = glob.glob(os.path.join(os.path.expanduser('~/.claude/projects'), '**', '*.jsonl'), recursive=True)
 
-# ── Data loading ─────────────────────────────────────────────────────────────
-
-def load_data(since: datetime):
-    projects_dir = os.path.expanduser('~/.claude/projects/')
-    files = glob.glob(os.path.join(projects_dir, '**', '*.jsonl'), recursive=True)
-
-    # Accumulators
-    by_day     = defaultdict(lambda: {'cost': 0.0, 'msgs': 0})
-    by_project = defaultdict(lambda: {'cost': 0.0, 'msgs': 0})
+    by_day     = defaultdict(lambda: {'cost': 0.0, 'calls': 0})
+    by_project = defaultdict(lambda: {'cost': 0.0, 'sessions': set()})
     by_model   = defaultdict(lambda: {'cost': 0.0, 'calls': 0})
     by_tool    = defaultdict(int)
-    by_bash    = defaultdict(int)
     by_mcp     = defaultdict(int)
+    sessions   = defaultdict(lambda: {'tools': [], 'cmds': [], 'cost': 0.0})
+    total      = {'cost': 0.0, 'calls': 0, 'in': 0, 'out': 0, 'cached': 0, 'written': 0}
 
-    # For activity: per session accumulation
-    session_data = defaultdict(lambda: {'tools': [], 'bash_cmds': [], 'cost': 0.0, 'msgs': 0, 'one_shot': False})
-
-    total_cost  = 0.0
-    total_msgs  = 0
-
-    for filepath in files:
+    for fp in files:
         try:
-            with open(filepath, 'r', errors='replace') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
+            for line in open(fp, errors='replace'):
+                line = line.strip()
+                if not line: continue
+                try:    obj = json.loads(line)
+                except: continue
+                if obj.get('type') != 'assistant': continue
+                ts_str = obj.get('timestamp', '')
+                if not ts_str: continue
+                try:    ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                except: continue
+                if ts < since: continue
 
-                    if obj.get('type') != 'assistant':
-                        continue
+                msg   = obj.get('message', {})
+                model = msg.get('model', 'unknown')
+                usage = msg.get('usage', {})
+                cwd   = obj.get('cwd', '')
+                sid   = obj.get('sessionId', '?')
+                day   = ts.strftime('%m-%d')
+                proj  = project_label(cwd)
+                cost  = calc_cost(model, usage)
 
-                    ts_str = obj.get('timestamp', '')
-                    if not ts_str:
-                        continue
-                    try:
-                        ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    except ValueError:
-                        continue
+                by_day[day]['cost']      += cost
+                by_day[day]['calls']     += 1
+                by_project[proj]['cost'] += cost
+                by_project[proj]['sessions'].add(sid)
+                by_model[model]['cost']  += cost
+                by_model[model]['calls'] += 1
+                total['cost']    += cost
+                total['calls']   += 1
+                total['in']      += usage.get('input_tokens', 0)
+                total['out']     += usage.get('output_tokens', 0)
+                total['cached']  += usage.get('cache_read_input_tokens', 0)
+                total['written'] += usage.get('cache_creation_input_tokens', 0)
 
-                    if ts < since:
-                        continue
+                for block in msg.get('content', []):
+                    if not isinstance(block, dict): continue
+                    btype = block.get('type', '')
+                    if btype == 'tool_use':
+                        t = block.get('name', '?')
+                        by_tool[t] += 1
+                        sessions[sid]['tools'].append(t)
+                        if t == 'Bash':
+                            raw = (block.get('input') or {}).get('command', '')
+                            parts = (raw or '').strip().split()
+                            if parts: sessions[sid]['cmds'].append(parts[0])
+                    elif btype == 'server_tool_use':
+                        by_mcp[block.get('name', 'mcp')] += 1
+                sessions[sid]['cost'] += cost
+        except: continue
 
-                    msg   = obj.get('message', {})
-                    model = msg.get('model', 'unknown')
-                    usage = msg.get('usage', {})
-                    cwd   = obj.get('cwd', '')
-                    sid   = obj.get('sessionId', 'unknown')
-                    day   = ts.strftime('%m-%d')
-                    proj  = project_label(cwd)
+    by_activity = defaultdict(lambda: {'cost': 0.0, 'turns': 0})
+    for sd in sessions.values():
+        act = classify(sd['tools'], sd['cmds'])
+        by_activity[act]['cost']  += sd['cost']
+        by_activity[act]['turns'] += 1
 
-                    cost = calc_cost(model, usage)
-
-                    # Aggregate
-                    by_day[day]['cost'] += cost
-                    by_day[day]['msgs'] += 1
-                    by_project[proj]['cost'] += cost
-                    by_project[proj]['msgs'] += 1
-                    by_model[model]['cost']  += cost
-                    by_model[model]['calls'] += 1
-                    total_cost += cost
-                    total_msgs += 1
-
-                    # Tools used in this message
-                    content = msg.get('content', [])
-                    for block in content:
-                        if not isinstance(block, dict):
-                            continue
-                        btype = block.get('type', '')
-                        if btype == 'tool_use':
-                            tool_name = block.get('name', 'unknown')
-                            by_tool[tool_name] += 1
-                            session_data[sid]['tools'].append(tool_name)
-                            if tool_name == 'Bash':
-                                cmd = extract_bash_cmd(block.get('input', {}))
-                                if cmd:
-                                    by_bash[cmd] += 1
-                                    session_data[sid]['bash_cmds'].append(cmd)
-                        elif btype == 'server_tool_use':
-                            name = block.get('name', 'mcp')
-                            by_mcp[name] += 1
-
-                    session_data[sid]['cost']  += cost
-                    session_data[sid]['msgs']  += 1
-
-        except (IOError, OSError):
-            continue
-
-    # Build activity breakdown from sessions
-    by_activity = defaultdict(lambda: {'cost': 0.0, 'turns': 0, 'one_shots': 0})
-    for sid, sd in session_data.items():
-        activity = classify_activity(sd['tools'], sd['bash_cmds'])
-        by_activity[activity]['cost']     += sd['cost']
-        by_activity[activity]['turns']    += sd['msgs']
-        if sd['msgs'] == 1:
-            by_activity[activity]['one_shots'] += 1
+    total_tok = total['in'] + total['cached'] + total['written']
+    cache_hit = (total['cached'] / total_tok * 100) if total_tok > 0 else 0
 
     return {
-        'total_cost':   total_cost,
-        'total_msgs':   total_msgs,
-        'by_day':       dict(by_day),
-        'by_project':   dict(by_project),
-        'by_model':     dict(by_model),
-        'by_tool':      dict(by_tool),
-        'by_bash':      dict(by_bash),
-        'by_mcp':       dict(by_mcp),
-        'by_activity':  dict(by_activity),
+        'total':       total,
+        'cache_hit':   cache_hit,
+        'sessions':    len(sessions),
+        'by_day':      dict(sorted(by_day.items())),
+        'by_project':  {k: {'cost': v['cost'], 'sessions': len(v['sessions'])} for k, v in by_project.items()},
+        'by_model':    dict(by_model),
+        'by_tool':     dict(by_tool),
+        'by_mcp':      dict(by_mcp),
+        'by_activity': dict(by_activity),
     }
 
-# ── Rendering ────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── CURSES TUI ────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 
-ANSI_RE = re.compile(r'\033\[[^m]*m')
+# Color pair names → index
+_CP = {}
 
-def strip_ansi(s):
-    return ANSI_RE.sub('', s)
+def setup_colors():
+    curses.start_color()
+    curses.use_default_colors()
+    has256 = curses.COLORS >= 256
 
-def vlen(s):
-    """Visible length of a string (ignores ANSI escape codes)."""
-    return len(strip_ansi(s))
+    pairs = {
+        'orange':  (214 if has256 else curses.COLOR_YELLOW, -1),
+        'cyan':    (curses.COLOR_CYAN,    -1),
+        'green':   (curses.COLOR_GREEN,   -1),
+        'magenta': (curses.COLOR_MAGENTA, -1),
+        'yellow':  (curses.COLOR_YELLOW,  -1),
+        'white':   (curses.COLOR_WHITE,   -1),
+        'dim':     (8 if has256 else curses.COLOR_BLACK, -1),
+        'red':     (curses.COLOR_RED,     -1),
+        'blue':    (curses.COLOR_BLUE,    -1),
+    }
+    for i, (name, (fg, bg)) in enumerate(pairs.items(), start=1):
+        curses.init_pair(i, fg, bg)
+        _CP[name] = i
 
-def pad_to(s, width):
-    """Pad string s to visible width, accounting for ANSI codes."""
-    pad = width - vlen(s)
-    return s + ' ' * max(0, pad)
+def cp(name, bold=False, dim=False):
+    attr = curses.color_pair(_CP.get(name, _CP['white']))
+    if bold: attr |= curses.A_BOLD
+    if dim:  attr |= curses.A_DIM
+    return attr
 
-def box_line(inner, color, inner_width):
-    """Wrap inner content (may contain ANSI) in box borders at fixed visible width."""
-    side = c(color, '│')
-    return side + pad_to(inner, inner_width) + side
+def saddstr(win, y, x, text, attr=0):
+    """Safe addstr — clips to window bounds."""
+    if not text: return
+    h, w = win.getmaxyx()
+    if y < 0 or y >= h or x < 0 or x >= w - 1: return
+    text = text[:max(0, w - x - 1)]
+    try: win.addstr(y, x, text, attr)
+    except curses.error: pass
 
-def box_top(inner_width, color):
-    return c(color, '┌' + '─' * inner_width + '┐')
+def draw_box(win, y, x, h, w, color, title=''):
+    """Draw a rounded-corner box with colored border and optional title."""
+    a = cp(color, bold=True)
+    try:
+        win.addch(y,     x,     curses.ACS_ULCORNER, a)
+        win.addch(y,     x+w-1, curses.ACS_URCORNER, a)
+        win.addch(y+h-1, x,     curses.ACS_LLCORNER, a)
+        win.addch(y+h-1, x+w-1, curses.ACS_LRCORNER, a)
+        for i in range(1, w-1):
+            win.addch(y,     x+i, curses.ACS_HLINE, a)
+            win.addch(y+h-1, x+i, curses.ACS_HLINE, a)
+        for i in range(1, h-1):
+            win.addch(y+i, x,     curses.ACS_VLINE, a)
+            win.addch(y+i, x+w-1, curses.ACS_VLINE, a)
+    except curses.error: pass
+    if title:
+        saddstr(win, y, x+2, f' {title} ', a)
 
-def box_bot(inner_width, color):
-    return c(color, '└' + '─' * inner_width + '┘')
+def draw_bar(win, y, x, value, max_val, width=14):
+    """Gradient bar: blue → yellow → orange."""
+    if max_val <= 0 or value <= 0: return
+    filled = max(1, int((value / max_val) * width))
+    t = max(1, width // 3)
+    for i in range(min(filled, width)):
+        color = 'blue' if i < t else ('yellow' if i < t * 2 else 'orange')
+        try: win.addch(y, x+i, ord('█'), cp(color, bold=True))
+        except curses.error: pass
 
-def render_daily(by_day, max_cost, iw=40):
-    """iw = inner width (chars between the │ borders)."""
-    days = sorted(by_day.keys())[-10:]
-    lines = [box_top(iw, CYN)]
-    for day in days:
-        d = by_day[day]
-        b        = bar_chart(d['cost'], max_cost, 8)
-        cost_str = c(YEL, f"{fmt_cost(d['cost']):>8}")
-        cnt_str  = c(WHT, f"{d['msgs']:>5}")
-        inner = f" {b} {day}  {cost_str}  {cnt_str} "
-        lines.append(box_line(inner, CYN, iw))
-    lines.append(box_bot(iw, CYN))
-    return lines
+# ── Panel renderers ───────────────────────────────────────────────────────────
 
-def render_projects(by_project, max_cost, iw=46):
-    items = sorted(by_project.items(), key=lambda x: -x[1]['cost'])[:8]
-    lines = [box_top(iw, MAG)]
-    for proj, d in items:
-        b        = bar_chart(d['cost'], max_cost, 8)
-        label    = proj[:22]
-        cost_str = c(YEL, f"{fmt_cost(d['cost']):>8}")
-        cnt_str  = c(WHT, f"{d['msgs']:>5}")
-        inner = f" {b} {label:<22}  {cost_str}  {cnt_str} "
-        lines.append(box_line(inner, MAG, iw))
-    lines.append(box_bot(iw, MAG))
-    return lines
+BAR_W = 14  # width of bar charts
 
-def render_activity(by_activity, iw=48):
-    items    = sorted(by_activity.items(), key=lambda x: -x[1]['cost'])
-    max_cost = max((v['cost'] for v in by_activity.values()), default=1)
-    lines    = [box_top(iw, YEL)]
-    lines.append(box_line(' ' + c(B + YEL, 'By Activity'), YEL, iw))
-    subhdr = f"{'':25}{c(DIM,'cost'):>4}   {'turns':>5}   {'1-shot':>6}"
-    lines.append(box_line(' ' + subhdr, YEL, iw))
-    for act, d in items:
-        b        = bar_chart(d['cost'], max_cost, 8)
-        turns    = d['turns']
-        ones     = d['one_shots']
-        pct      = f"{int(ones/turns*100)}%" if turns > 0 else '-'
-        cost_str = c(YEL, f"{fmt_cost(d['cost']):>8}")
-        act_clr  = CYN if d['cost'] > max_cost * 0.3 else WHT
-        pct_clr  = GRN if ones > 0 else DIM
-        inner = (f" {b} {c(act_clr, f'{act:<14}')}"
-                 f"  {cost_str}  {turns:>5}  {c(pct_clr, f'{pct:>6}')}")
-        lines.append(box_line(inner, YEL, iw))
-    lines.append(box_bot(iw, YEL))
-    return lines
+def _subhdr(win, y, x, w, cols):
+    """Right-align column headers inside a panel."""
+    txt = '  '.join(cols)
+    saddstr(win, y, x + w - len(txt) - 2, txt, cp('dim'))
 
-def render_models(by_model, iw=46):
-    items    = sorted(by_model.items(), key=lambda x: -x[1]['cost'])
-    max_cost = max((v['cost'] for v in by_model.values()), default=1)
-    lines    = [box_top(iw, MAG)]
-    lines.append(box_line(' ' + c(B + MAG, 'By Model'), MAG, iw))
-    subhdr = f"{'':25}{c(DIM,'cost'):>4}   {'calls':>6}"
-    lines.append(box_line(' ' + subhdr, MAG, iw))
-    for model, d in items:
-        b        = bar_chart(d['cost'], max_cost, 8)
-        label    = model_label(model)[:20]
-        cost_str = c(YEL, f"{fmt_cost(d['cost']):>8}")
-        inner    = f" {b} {label:<20}  {cost_str}  {d['calls']:>6}"
-        lines.append(box_line(inner, MAG, iw))
-    lines.append(box_bot(iw, MAG))
-    return lines
+def panel_daily(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'cyan', 'Daily Activity')
+    items  = list(sorted(data['by_day'].items()))[-max(1, h-4):]
+    max_c  = max((v['cost']  for v in data['by_day'].values()), default=1)
+    _subhdr(win, y+1, x, w, ['cost', 'calls'])
+    for i, (day, d) in enumerate(items):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, d['cost'], max_c, BAR_W)
+        saddstr(win, r, x+BAR_W+2, day, cp('white'))
+        saddstr(win, r, x+w-14, fmt_cost(d['cost']), cp('orange', bold=True))
+        saddstr(win, r, x+w-6,  str(d['calls']),     cp('white'))
 
-def render_tools(by_tool, iw=36):
-    items     = sorted(by_tool.items(), key=lambda x: -x[1])[:12]
-    max_calls = max(by_tool.values(), default=1)
-    lines     = [box_top(iw, CYN)]
-    lines.append(box_line(' ' + c(B + CYN, 'Core Tools'), CYN, iw))
-    subhdr = f"{'':25}{c(DIM,'calls'):>5}"
-    lines.append(box_line(' ' + subhdr, CYN, iw))
-    for tool, calls in items:
-        b     = bar_chart(calls, max_calls, 8)
-        inner = f" {b} {tool:<14}  {calls:>6}"
-        lines.append(box_line(inner, CYN, iw))
-    lines.append(box_bot(iw, CYN))
-    return lines
+def panel_projects(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'green', 'By Project')
+    items = sorted(data['by_project'].items(), key=lambda v: -v[1]['cost'])
+    max_c = max((v['cost'] for v in data['by_project'].values()), default=1)
+    _subhdr(win, y+1, x, w, ['cost', 'sess'])
+    for i, (proj, d) in enumerate(items[:h-4]):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, d['cost'], max_c, BAR_W)
+        label = proj[:w - BAR_W - 16]
+        saddstr(win, r, x+BAR_W+2, label,              cp('white'))
+        saddstr(win, r, x+w-14,    fmt_cost(d['cost']), cp('orange', bold=True))
+        saddstr(win, r, x+w-5,     str(d['sessions']),  cp('white'))
 
-def render_bash(by_bash, iw=36):
-    items     = sorted(by_bash.items(), key=lambda x: -x[1])[:12]
-    max_calls = max(by_bash.values(), default=1)
-    lines     = [box_top(iw, GRN)]
-    lines.append(box_line(' ' + c(B + GRN, 'Shell Commands'), GRN, iw))
-    subhdr = f"{'':25}{c(DIM,'calls'):>5}"
-    lines.append(box_line(' ' + subhdr, GRN, iw))
-    for cmd, calls in items:
-        b     = bar_chart(calls, max_calls, 8)
-        inner = f" {b} {cmd:<14}  {calls:>6}"
-        lines.append(box_line(inner, GRN, iw))
-    lines.append(box_bot(iw, GRN))
-    return lines
+def panel_models(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'magenta', 'By Model')
+    items = sorted(data['by_model'].items(), key=lambda v: -v[1]['cost'])
+    max_c = max((v['cost'] for v in data['by_model'].values()), default=1)
+    _subhdr(win, y+1, x, w, ['cost', 'calls'])
+    for i, (model, d) in enumerate(items[:h-4]):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, d['cost'], max_c, BAR_W)
+        label    = model_label(model)
+        cost_clr = 'orange' if d['cost'] == max(v['cost'] for v in data['by_model'].values()) else 'white'
+        saddstr(win, r, x+BAR_W+2, label,             cp('white'))
+        saddstr(win, r, x+w-14,    fmt_cost(d['cost']), cp(cost_clr, bold=(cost_clr=='orange')))
+        saddstr(win, r, x+w-6,     str(d['calls']),     cp('white'))
 
-def render_mcp(by_mcp, iw=90):
-    lines = [box_top(iw, MAG)]
-    lines.append(box_line(' ' + c(B + MAG, 'MCP Servers'), MAG, iw))
-    if not by_mcp:
-        lines.append(box_line(' ' + c(DIM, 'No MCP usage'), MAG, iw))
-    else:
-        items = sorted(by_mcp.items(), key=lambda x: -x[1])[:5]
-        for name, calls in items:
-            inner = f"  {name:<30}  {calls:>6} calls"
-            lines.append(box_line(inner, MAG, iw))
-    lines.append(box_bot(iw, MAG))
-    return lines
+def panel_activity(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'yellow', 'By Activity')
+    items = sorted(data['by_activity'].items(), key=lambda v: -v[1]['cost'])
+    max_c = max((v['cost'] for v in data['by_activity'].values()), default=1)
+    _subhdr(win, y+1, x, w, ['cost', 'turns'])
+    for i, (act, d) in enumerate(items[:h-4]):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, d['cost'], max_c, BAR_W)
+        aclr = ACTIVITY_CP.get(act, 'white')
+        saddstr(win, r, x+BAR_W+2, act,              cp(aclr))
+        saddstr(win, r, x+w-14,    fmt_cost(d['cost']), cp('orange', bold=True))
+        saddstr(win, r, x+w-6,     str(d['turns']),     cp('white'))
 
-def side_by_side(left, right, gap=2):
-    max_len = max(len(left), len(right))
-    left  += [''] * (max_len - len(left))
-    right += [''] * (max_len - len(right))
-    return [l + ' ' * gap + r for l, r in zip(left, right)]
+def panel_tools(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'cyan', 'Core Tools')
+    items = sorted(data['by_tool'].items(), key=lambda v: -v[1])
+    max_c = max(data['by_tool'].values(), default=1)
+    _subhdr(win, y+1, x, w, ['calls'])
+    for i, (tool, calls) in enumerate(items[:h-4]):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, calls, max_c, BAR_W)
+        saddstr(win, r, x+BAR_W+2, tool,       cp('white'))
+        saddstr(win, r, x+w-7,     str(calls),  cp('white'))
 
-def render(data, period_label):
-    term_width = shutil.get_terminal_size((120, 40)).columns
+def panel_mcp(win, y, x, h, w, data):
+    draw_box(win, y, x, h, w, 'magenta', 'MCP Servers')
+    _subhdr(win, y+1, x, w, ['calls'])
+    if not data['by_mcp']:
+        saddstr(win, y+2, x+2, 'No MCP usage', cp('dim'))
+        return
+    items = sorted(data['by_mcp'].items(), key=lambda v: -v[1])
+    max_c = max(data['by_mcp'].values(), default=1)
+    for i, (name, calls) in enumerate(items[:h-4]):
+        r = y + 2 + i
+        if r >= y + h - 1: break
+        draw_bar(win, r, x+1, calls, max_c, BAR_W)
+        saddstr(win, r, x+BAR_W+2, name,      cp('white'))
+        saddstr(win, r, x+w-7,     str(calls), cp('white'))
 
-    total_cost = data['total_cost']
-    total_msgs = data['total_msgs']
-    by_day     = data['by_day']
-    by_project = data['by_project']
-    by_model   = data['by_model']
-    by_tool    = data['by_tool']
-    by_bash    = data['by_bash']
-    by_mcp     = data['by_mcp']
-    by_activity= data['by_activity']
+# ── Header & footer ───────────────────────────────────────────────────────────
 
-    max_cost_day  = max((v['cost'] for v in by_day.values()),     default=1)
-    max_cost_proj = max((v['cost'] for v in by_project.values()), default=1)
-    max_cost_all  = max(max_cost_day, max_cost_proj)
+def draw_header(win, period, data):
+    total = data['total']
 
-    print()
-    # ── Header ────────────────────────────────────────────────────────────
-    title  = f"  {c(B+WHT, 'tokenburn')}  {c(DIM, '—')}  {c(YEL, fmt_cost(total_cost))} total  {c(DIM, '·')}  {c(WHT, str(total_msgs))} messages  {c(DIM, '·')}  {c(CYN, period_label)}"
-    print(title)
-    print(c(DIM, '  ' + '─' * min(60, term_width - 4)))
-    print()
+    # Period tab bar
+    x = 2
+    for p in PERIODS:
+        label = PERIOD_LABEL[p]
+        if p == period:
+            saddstr(win, 0, x, f'[ {label} ]', cp('white', bold=True))
+            x += len(label) + 4
+        else:
+            saddstr(win, 0, x, label, cp('dim'))
+            x += len(label) + 3
 
-    # ── Row 1: Daily + Projects ───────────────────────────────────────────
-    daily   = render_daily(by_day, max_cost_all)
-    projects= render_projects(by_project, max_cost_all)
-    row1 = side_by_side(daily, projects, gap=2)
-    for line in row1:
-        print('  ' + line)
-    print()
+    # Title line
+    saddstr(win, 1, 2, 'CodeBurn', cp('orange', bold=True))
+    saddstr(win, 1, 12, PERIOD_LABEL[period], cp('dim'))
 
-    # ── Row 2: Activity + Models ──────────────────────────────────────────
-    activity = render_activity(by_activity)
-    models   = render_models(by_model)
-    row2 = side_by_side(activity, models, gap=2)
-    for line in row2:
-        print('  ' + line)
-    print()
+    # Stats line
+    cost_s  = fmt_cost(total['cost'])
+    calls_s = f"{total['calls']:,}"
+    sess_s  = str(data['sessions'])
+    cache_s = f"{data['cache_hit']:.0f}%"
+    saddstr(win, 2, 2, cost_s,     cp('orange', bold=True))
+    saddstr(win, 2, 2+len(cost_s), f' cost   ', cp('white'))
+    cx = 2+len(cost_s)+8
+    saddstr(win, 2, cx, calls_s, cp('white', bold=True))
+    saddstr(win, 2, cx+len(calls_s), ' calls   ', cp('white'))
+    cx += len(calls_s)+9
+    saddstr(win, 2, cx, sess_s, cp('white', bold=True))
+    saddstr(win, 2, cx+len(sess_s), ' sessions   ', cp('white'))
+    cx += len(sess_s)+12
+    saddstr(win, 2, cx, cache_s, cp('white', bold=True))
+    saddstr(win, 2, cx+len(cache_s), ' cache hit', cp('white'))
 
-    # ── Row 3: Tools + Bash ───────────────────────────────────────────────
-    tools = render_tools(by_tool)
-    bash  = render_bash(by_bash)
-    row3 = side_by_side(tools, bash, gap=2)
-    for line in row3:
-        print('  ' + line)
-    print()
+    # Token counts
+    tok = (f"{fmt_num(total['in'])} in   {fmt_num(total['out'])} out   "
+           f"{fmt_num(total['cached'])} cached   {fmt_num(total['written'])} written")
+    saddstr(win, 3, 2, tok, cp('dim'))
 
-    # ── MCP ───────────────────────────────────────────────────────────────
-    mcp = render_mcp(by_mcp)
-    for line in mcp:
-        print('  ' + line)
-    print()
-
-    # ── Footer ────────────────────────────────────────────────────────────
-    footer_items = [
-        ('--today',  '1 today'),
-        ('--week',   '2 week'),
-        ('--30d',    '3 thirty days'),
-        ('--month',  '4 month'),
+def draw_footer(win):
+    h, w = win.getmaxyx()
+    parts = [
+        ('<>',     'dim',    ' switch   '),
+        ('q',      'dim',    ' quit   '),
+        ('1',      'yellow', ' today   '),
+        ('2',      'yellow', ' week   '),
+        ('3',      'yellow', ' month'),
     ]
-    footer = '  ' + c(DIM, '  ·  '.join(
-        f"{c(YEL, item[1])}" for item in footer_items
-    ))
-    print(footer)
+    # calculate total visible length
+    total_len = sum(len(k)+len(rest) for k, _, rest in parts)
+    x = max(0, (w - total_len) // 2)
+    for key, kclr, rest in parts:
+        saddstr(win, h-1, x, key,  cp(kclr, bold=True))
+        x += len(key)
+        saddstr(win, h-1, x, rest, cp('white'))
+        x += len(rest)
+
+# ── Main draw ─────────────────────────────────────────────────────────────────
+
+HEADER_H = 5   # rows 0-4
+FOOTER_H = 1
+
+def draw_all(win, period, data):
+    win.erase()
+    h, w = win.getmaxyx()
+
+    avail = h - HEADER_H - FOOTER_H
+    if avail < 6:
+        saddstr(win, 0, 0, 'Terminal too small', cp('red'))
+        win.refresh()
+        return
+
+    # Panel heights — split 3 rows, give activity extra if possible
+    ph = [avail // 3] * 3
+    ph[0] += avail - sum(ph)  # give remainder to row 0
+
+    lw = w // 2
+    rw = w - lw
+
+    draw_header(win, period, data)
+
+    ry = [HEADER_H, HEADER_H + ph[0], HEADER_H + ph[0] + ph[1]]
+
+    panel_daily(win,    ry[0], 0,  ph[0], lw, data)
+    panel_projects(win, ry[0], lw, ph[0], rw, data)
+
+    panel_models(win,   ry[1], 0,  ph[1], lw, data)
+    panel_activity(win, ry[1], lw, ph[1], rw, data)
+
+    panel_tools(win, ry[2], 0,  ph[2], lw, data)
+    panel_mcp(win,   ry[2], lw, ph[2], rw, data)
+
+    draw_footer(win)
+    win.refresh()
+
+# ── App loop ──────────────────────────────────────────────────────────────────
+
+def run_tui(stdscr):
+    setup_colors()
+    curses.curs_set(0)
+    stdscr.timeout(200)
+
+    period = 'week'
+
+    # Show loading
+    stdscr.erase()
+    saddstr(stdscr, 0, 2, 'CodeBurn', cp('orange', bold=True) if _CP else 0)
+    saddstr(stdscr, 1, 2, 'Loading data…')
+    stdscr.refresh()
+    data = load_data(period)
+
+    while True:
+        draw_all(stdscr, period, data)
+        key = stdscr.getch()
+        if key in (ord('q'), ord('Q'), 27):
+            break
+        elif key == ord('1'):
+            period = 'today';  data = load_data(period)
+        elif key == ord('2'):
+            period = 'week';   data = load_data(period)
+        elif key == ord('3'):
+            period = 'month';  data = load_data(period)
+        elif key == curses.KEY_RESIZE:
+            stdscr.erase()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── STATIC ANSI OUTPUT (for non-TTY / Claude Bash tool) ──────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+
+R    = '\033[0m'
+BOLD = '\033[1m'
+DIM  = '\033[2m'
+
+ANSI = {
+    'orange':  '\033[38;5;214m',
+    'cyan':    '\033[36m',
+    'green':   '\033[32m',
+    'magenta': '\033[35m',
+    'yellow':  '\033[33m',
+    'white':   '\033[97m',
+    'dim':     '\033[2m',
+    'red':     '\033[31m',
+    'blue':    '\033[34m',
+    'reset':   R,
+}
+
+ACT_ANSI = {
+    'Conversation': ANSI['dim'],
+    'Coding':       ANSI['cyan'],
+    'Exploration':  ANSI['cyan'],
+    'Planning':     ANSI['green'],
+    'Brainstorming':ANSI['magenta'],
+    'Delegation':   ANSI['yellow'],
+    'Debugging':    ANSI['orange'],
+    'Feature Dev':  ANSI['green'],
+    'General':      ANSI['dim'],
+    'Testing':      ANSI['green'],
+    'Refactoring':  ANSI['green'],
+    'Build/Deploy': ANSI['green'],
+}
+
+import re as _re
+_ANSI_RE = _re.compile(r'\033\[[^m]*m')
+
+def _vlen(s): return len(_ANSI_RE.sub('', s))
+def _pad(s, w): return s + ' ' * max(0, w - _vlen(s))
+def _col(name, text, bold=False):
+    return f"{BOLD if bold else ''}{ANSI.get(name,'')}{text}{R}"
+
+def _ansi_bar(value, max_val, width=14):
+    if max_val <= 0 or value <= 0: return ' ' * width
+    filled = max(1, int((value / max_val) * width))
+    t = max(1, width // 3)
+    bar = ''
+    for i in range(min(filled, width)):
+        clr = 'blue' if i < t else ('yellow' if i < t*2 else 'orange')
+        bar += f"{ANSI[clr]}█{R}"
+    bar += ' ' * max(0, width - filled)
+    return bar
+
+def _box_top(iw, clr):
+    return f"{ANSI[clr]}┌{'─'*iw}┐{R}"
+def _box_bot(iw, clr):
+    return f"{ANSI[clr]}└{'─'*iw}┘{R}"
+def _box_row(content, iw, clr):
+    side = f"{ANSI[clr]}│{R}"
+    return side + _pad(content, iw) + side
+
+def static_output(period, data):
+    import shutil
+    TW = shutil.get_terminal_size((120, 40)).columns
+    total = data['total']
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    print()
+    # Period tabs
+    tabs = ''
+    for p in PERIODS:
+        label = PERIOD_LABEL[p]
+        tabs += (f"  {BOLD}{label}{R}" if p == period else f"  {_col('dim', label)}")
+    print(f"  {tabs}")
     print()
 
-# ── Entry point ──────────────────────────────────────────────────────────────
+    # Title
+    cost_s  = fmt_cost(total['cost'])
+    calls_s = f"{total['calls']:,}"
+    sess_s  = str(data['sessions'])
+    cache_s = f"{data['cache_hit']:.0f}%"
+    print(f"  {_col('orange', 'CodeBurn', bold=True)}  {_col('dim', PERIOD_LABEL[period])}")
+    print(f"  {_col('orange', cost_s, bold=True)} cost   "
+          f"{BOLD}{calls_s}{R} calls   {BOLD}{sess_s}{R} sessions   "
+          f"{BOLD}{cache_s}{R} cache hit")
+    tok = (f"{_col('dim', fmt_num(total['in'])+' in')}   "
+           f"{_col('dim', fmt_num(total['out'])+' out')}   "
+           f"{_col('dim', fmt_num(total['cached'])+' cached')}   "
+           f"{_col('dim', fmt_num(total['written'])+' written')}")
+    print(f"  {tok}")
+    print()
+
+    # ── Panel helpers ─────────────────────────────────────────────────────────
+    # Each panel pair: left and right rendered to line lists, then zipped
+
+    half   = TW // 2 - 2
+    iw     = half - 2   # inner width (between │ borders)
+    bw     = 14         # bar width
+    BW14   = bw
+
+    def make_panel_daily():
+        items = list(sorted(data['by_day'].items()))[-10:]
+        max_c = max((v['cost']  for v in data['by_day'].values()), default=1)
+        lines = [_box_top(iw, 'cyan')]
+        # title embedded in top border
+        lines[0] = f"{ANSI['cyan']}┌─ {BOLD}{_col('cyan','Daily Activity')}{ANSI['cyan']} {'─'*(iw-18)}┐{R}"
+        lines.append(_box_row(f"  {'cost':>10}  {'calls':>5}", iw, 'cyan'))
+        for day, d in items:
+            bar   = _ansi_bar(d['cost'], max_c, BW14)
+            cost  = _col('orange', f"{fmt_cost(d['cost']):>10}", bold=True)
+            calls = f"{d['calls']:>5}"
+            row   = f" {bar} {day}  {cost}  {calls}"
+            lines.append(_box_row(row, iw, 'cyan'))
+        lines.append(_box_bot(iw, 'cyan'))
+        return lines
+
+    def make_panel_projects():
+        items = sorted(data['by_project'].items(), key=lambda v: -v[1]['cost'])[:8]
+        max_c = max((v['cost'] for v in data['by_project'].values()), default=1)
+        lines = [f"{ANSI['green']}┌─ {BOLD}{_col('green','By Project')}{ANSI['green']} {'─'*(iw-14)}┐{R}"]
+        lines.append(_box_row(f"  {'cost':>10}  {'sess':>5}", iw, 'green'))
+        for proj, d in items:
+            bar   = _ansi_bar(d['cost'], max_c, BW14)
+            label = proj[:iw - BW14 - 20]
+            cost  = _col('orange', f"{fmt_cost(d['cost']):>10}", bold=True)
+            sess  = f"{d['sessions']:>5}"
+            row   = f" {bar} {label:<{iw-BW14-20}}  {cost}  {sess}"
+            lines.append(_box_row(row, iw, 'green'))
+        lines.append(_box_bot(iw, 'green'))
+        return lines
+
+    def make_panel_models():
+        items = sorted(data['by_model'].items(), key=lambda v: -v[1]['cost'])
+        max_c = max((v['cost'] for v in data['by_model'].values()), default=1)
+        lines = [f"{ANSI['magenta']}┌─ {BOLD}{_col('magenta','By Model')}{ANSI['magenta']} {'─'*(iw-12)}┐{R}"]
+        lines.append(_box_row(f"  {'cost':>10}  {'calls':>5}", iw, 'magenta'))
+        for model, d in items:
+            bar   = _ansi_bar(d['cost'], max_c, BW14)
+            label = f"{model_label(model):<16}"
+            clr   = 'orange' if d['cost'] == max_c else 'white'
+            cost  = _col(clr, f"{fmt_cost(d['cost']):>10}", bold=(clr=='orange'))
+            calls = f"{d['calls']:>5}"
+            row   = f" {bar} {label}  {cost}  {calls}"
+            lines.append(_box_row(row, iw, 'magenta'))
+        lines.append(_box_bot(iw, 'magenta'))
+        return lines
+
+    def make_panel_activity():
+        items = sorted(data['by_activity'].items(), key=lambda v: -v[1]['cost'])
+        max_c = max((v['cost'] for v in data['by_activity'].values()), default=1)
+        lines = [f"{ANSI['yellow']}┌─ {BOLD}{_col('yellow','By Activity')}{ANSI['yellow']} {'─'*(iw-15)}┐{R}"]
+        lines.append(_box_row(f"  {'cost':>10}  {'turns':>5}", iw, 'yellow'))
+        for act, d in items:
+            bar   = _ansi_bar(d['cost'], max_c, BW14)
+            aclr  = ACT_ANSI.get(act, ANSI['white'])
+            label = f"{aclr}{act:<14}{R}"
+            cost  = _col('orange', f"{fmt_cost(d['cost']):>10}", bold=True)
+            turns = f"{d['turns']:>5}"
+            row   = f" {bar} {label}  {cost}  {turns}"
+            lines.append(_box_row(row, iw, 'yellow'))
+        lines.append(_box_bot(iw, 'yellow'))
+        return lines
+
+    def make_panel_tools():
+        items = sorted(data['by_tool'].items(), key=lambda v: -v[1])[:12]
+        max_c = max(data['by_tool'].values(), default=1)
+        lines = [f"{ANSI['cyan']}┌─ {BOLD}{_col('cyan','Core Tools')}{ANSI['cyan']} {'─'*(iw-14)}┐{R}"]
+        lines.append(_box_row(f"  {'calls':>5}", iw, 'cyan'))
+        for tool, calls in items:
+            bar = _ansi_bar(calls, max_c, BW14)
+            row = f" {bar} {tool:<16}  {calls:>5}"
+            lines.append(_box_row(row, iw, 'cyan'))
+        lines.append(_box_bot(iw, 'cyan'))
+        return lines
+
+    def make_panel_mcp():
+        lines = [f"{ANSI['magenta']}┌─ {BOLD}{_col('magenta','MCP Servers')}{ANSI['magenta']} {'─'*(iw-15)}┐{R}"]
+        lines.append(_box_row(f"  {'calls':>5}", iw, 'magenta'))
+        if not data['by_mcp']:
+            lines.append(_box_row(f" {_col('dim','No MCP usage')}", iw, 'magenta'))
+        else:
+            items = sorted(data['by_mcp'].items(), key=lambda v: -v[1])[:10]
+            max_c = max(data['by_mcp'].values(), default=1)
+            for name, calls in items:
+                bar = _ansi_bar(calls, max_c, BW14)
+                row = f" {bar} {name:<20}  {calls:>5}"
+                lines.append(_box_row(row, iw, 'magenta'))
+        lines.append(_box_bot(iw, 'magenta'))
+        return lines
+
+    def print_pair(left, right, gap=2):
+        n = max(len(left), len(right))
+        left  += [''] * (n - len(left))
+        right += [''] * (n - len(right))
+        for l, r in zip(left, right):
+            print('  ' + l + ' ' * gap + r)
+
+    print_pair(make_panel_daily(),    make_panel_projects())
+    print()
+    print_pair(make_panel_models(),   make_panel_activity())
+    print()
+    print_pair(make_panel_tools(),    make_panel_mcp())
+    print()
+
+    # Footer
+    footer = (f"  {_col('dim','<>')} switch   "
+              f"{_col('dim','q')} quit   "
+              f"{_col('yellow','1',bold=True)} today   "
+              f"{_col('yellow','2',bold=True)} week   "
+              f"{_col('yellow','3',bold=True)} month")
+    hw = TW // 2
+    print(' ' * max(0, hw - 25) + footer)
+    print()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Entry point ───────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    arg = '--today'
+    period = 'week'
     for a in sys.argv[1:]:
-        if a in ('--today', '--week', '--30d', '--month'):
-            arg = a
+        a = a.lower().lstrip('-')
+        if a == 'today':            period = 'today'
+        elif a in ('week', '7d'):   period = 'week'
+        elif a in ('month', '30d'): period = 'month'
 
-    period_labels = {
-        '--today': 'today',
-        '--week':  'last 7 days',
-        '--30d':   'last 30 days',
-        '--month': 'this month',
-    }
+    is_tty = sys.stdout.isatty()
 
-    since = period_start(arg)
-    label = period_labels[arg]
-
-    print(c(DIM, f"  Loading usage data ({label})…"), end='\r', flush=True)
-    data = load_data(since)
-    print(' ' * 40, end='\r')  # clear loading line
-
-    render(data, label)
+    if is_tty and '--static' not in sys.argv:
+        # Full interactive TUI
+        try:
+            curses.wrapper(run_tui)
+        except KeyboardInterrupt:
+            pass
+    else:
+        # Static ANSI output (for Claude's Bash tool or piped output)
+        sys.stderr.write(f'  Loading tokenburn data ({PERIOD_LABEL[period]})…\r')
+        sys.stderr.flush()
+        data = load_data(period)
+        sys.stderr.write(' ' * 45 + '\r')
+        static_output(period, data)
 
 if __name__ == '__main__':
     main()

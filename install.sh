@@ -174,23 +174,53 @@ else
   dim "  Memory template already exists"
 fi
 
-# ─── Install tokenburn (/tokenburn command + analytics script) ───────────────
+# ─── Install /tokenburn command file ─────────────────────────────────────────
 header "Installing /tokenburn..."
 
 COMMANDS_DIR="$(dirname "$SKILLS_DIR")/commands"
-SCRIPTS_DEST="${CLAUDE_HOME}/plugins/superpowers-overrides/scripts"
-
-mkdir -p "$COMMANDS_DIR" "$SCRIPTS_DEST"
+mkdir -p "$COMMANDS_DIR"
 
 if [[ -f "${SOURCE_DIR}/commands/tokenburn.md" ]]; then
   cp "${SOURCE_DIR}/commands/tokenburn.md" "${COMMANDS_DIR}/tokenburn.md"
-  success "/tokenburn command installed"
+  success "/tokenburn slash command installed"
 fi
 
-if [[ -f "${SOURCE_DIR}/scripts/tokenburn.py" ]]; then
-  cp "${SOURCE_DIR}/scripts/tokenburn.py" "${SCRIPTS_DEST}/tokenburn.py"
-  chmod +x "${SCRIPTS_DEST}/tokenburn.py"
-  success "tokenburn analytics script installed"
+# ─── Build & link tokenburn CLI ───────────────────────────────────────────────
+header "Building tokenburn CLI..."
+
+TOKENBURN_SRC="${SOURCE_DIR}/tools/tokenburn"
+
+if [[ -d "$TOKENBURN_SRC" ]]; then
+  if ! command -v node &>/dev/null; then
+    warn "Node.js not found — tokenburn CLI requires Node.js 20+."
+    dim "  Install Node.js and re-run: bash install.sh"
+  else
+    NODE_VER=$(node -e "process.stdout.write(process.version.slice(1).split('.')[0])" 2>/dev/null || echo "0")
+    if [[ "$NODE_VER" -lt 20 ]]; then
+      warn "Node.js v${NODE_VER} found, but tokenburn requires v20+."
+      dim "  Upgrade Node.js and re-run: bash install.sh"
+    else
+      info "Building tokenburn (Node.js v${NODE_VER})…"
+      (cd "$TOKENBURN_SRC" && npm install --silent 2>/dev/null && npm run build --silent 2>/dev/null)
+      if [[ -f "${TOKENBURN_SRC}/dist/cli.js" ]]; then
+        (cd "$TOKENBURN_SRC" && npm link --silent 2>/dev/null)
+        if command -v tokenburn &>/dev/null; then
+          success "tokenburn CLI installed → $(which tokenburn)"
+        else
+          # fallback: add a wrapper in ~/.local/bin
+          mkdir -p "${HOME}/.local/bin"
+          printf '#!/bin/bash\nnode "%s/dist/cli.js" "$@"\n' "$TOKENBURN_SRC" > "${HOME}/.local/bin/tokenburn"
+          chmod +x "${HOME}/.local/bin/tokenburn"
+          success "tokenburn installed → ~/.local/bin/tokenburn"
+          dim "  Add ~/.local/bin to your PATH if not already present."
+        fi
+      else
+        warn "Build failed — tokenburn CLI not installed. Check Node.js setup."
+      fi
+    fi
+  fi
+else
+  warn "tools/tokenburn not found in source — skipping CLI build."
 fi
 
 # ─── Verify installation ──────────────────────────────────────────────────────
